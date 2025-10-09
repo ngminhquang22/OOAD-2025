@@ -1,4 +1,4 @@
-# PhanTichThietKeOOP_9-2025
+# Phân tích và thiết kế hướng đối tượng - 2025
 
 ## Danh sách thành viên nhóm
 - Nguyễn Minh Quang: 3123410290
