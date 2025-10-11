@@ -6,7 +6,7 @@
         QuanLyNet-->QuanLyGiaoDich
         QuanLyNet-->QuanLyKhoHang
         QuanLyNet-->QuanLyDichVu
-        QuanLyNet-->QuanLyBaoCao&ThongKe
+        QuanLyNet-->BaoCao&ThongKe
         
         QuanLyNhanVien-->PhanQuyen
         QuanLyNhanVien-->QuanLyCaLamViec
