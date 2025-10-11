@@ -8,11 +8,3 @@
 - Nguyễn Việt Hoàng: 3122560022
 - Nguyễn Vĩnh Khang: 3123560039
 
-## Task 1:
-- Chọn đề tài [ ]
-- Chọn ngôn ngữ [ ]
-- Chọn môi trường [ ]
-- Mô tả chức năng, yêu cầu của hệ thống [ ]
-- Vẽ sơ đồ chức năng BFD [ ]
-
-## Task 2:
