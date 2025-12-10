@@ -16,4 +16,8 @@ public class OrderService {
     public List<OrderDetail> getOrderDetails(int orderId) {
         return orderDAL.getOrderDetails(orderId);
     }
+
+    public boolean createOrder(Order order, List<OrderDetail> details) {
+        return orderDAL.createOrder(order, details);
+    }
 }

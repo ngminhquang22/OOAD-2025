@@ -16,9 +16,12 @@ public class CustomerDAL {
 
     public List<Customer> getAllCustomers() {
         List<Customer> list = new ArrayList<>();
-        String sql = "SELECT c.*, u.Username, u.Email FROM Customers c " +
+        String sql = "SELECT c.*, u.Username, u.Email, comp.ComputerName " +
+                     "FROM Customers c " +
                      "JOIN Users u ON c.UserID = u.UserID " +
-                     "WHERE u.IsActive = 1";
+                     "LEFT JOIN Sessions s ON c.CustomerID = s.CustomerID AND s.Status = 'Hoạt động' " +
+                     "LEFT JOIN Computers comp ON s.ComputerID = comp.ComputerID " +
+                     "WHERE u.IsActive = 1 AND (u.IsDeleted = 0 OR u.IsDeleted IS NULL)";
         try (Connection conn = DatabaseHelper.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
@@ -35,6 +38,7 @@ public class CustomerDAL {
                 );
                 c.setUsername(rs.getString("Username"));
                 c.setEmail(rs.getString("Email"));
+                c.setCurrentMachine(rs.getString("ComputerName"));
                 list.add(c);
             }
         } catch (SQLException e) {
@@ -66,6 +70,68 @@ public class CustomerDAL {
             e.printStackTrace();
         }
         return null;
+    }
+
+    public Customer getCustomerById(int customerId) {
+        String sql = "SELECT * FROM Customers WHERE CustomerID = ?";
+        try (Connection conn = DatabaseHelper.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, customerId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return new Customer(
+                    rs.getInt("CustomerID"),
+                    rs.getInt("UserID"),
+                    rs.getString("FullName"),
+                    rs.getString("PhoneNumber"),
+                    rs.getBigDecimal("Balance"),
+                    rs.getString("MembershipLevel"),
+                    rs.getInt("RemainingTimeMinutes")
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public boolean sendSupportMessage(int customerId, int senderUserId, String content) {
+        Connection conn = null;
+        try {
+            conn = DatabaseHelper.getConnection();
+            conn.setAutoCommit(false);
+            
+            // Create Request
+            String reqSql = "INSERT INTO SupportRequests (CustomerID, Subject, Status) VALUES (?, ?, 'Open')";
+            int requestId = -1;
+            try (PreparedStatement pstmt = conn.prepareStatement(reqSql, Statement.RETURN_GENERATED_KEYS)) {
+                pstmt.setInt(1, customerId);
+                pstmt.setString(2, "Tin nhắn từ nhân viên");
+                pstmt.executeUpdate();
+                ResultSet rs = pstmt.getGeneratedKeys();
+                if (rs.next()) requestId = rs.getInt(1);
+            }
+            
+            // Create Message
+            if (requestId != -1) {
+                String msgSql = "INSERT INTO SupportMessages (RequestID, SenderUserID, Content) VALUES (?, ?, ?)";
+                try (PreparedStatement pstmt = conn.prepareStatement(msgSql)) {
+                    pstmt.setInt(1, requestId);
+                    pstmt.setInt(2, senderUserId);
+                    pstmt.setString(3, content);
+                    pstmt.executeUpdate();
+                }
+            }
+            
+            conn.commit();
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            if (conn != null) try { conn.rollback(); } catch (SQLException ex) {}
+            return false;
+        } finally {
+            if (conn != null) try { conn.setAutoCommit(true); conn.close(); } catch (SQLException e) {}
+        }
     }
 
     public boolean addCustomer(Customer customer, String username, String password, String email) {
@@ -152,7 +218,6 @@ public class CustomerDAL {
         String sql = "UPDATE Customers SET Balance = ? WHERE CustomerID = ?";
         try (Connection conn = DatabaseHelper.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
             pstmt.setBigDecimal(1, newBalance);
             pstmt.setInt(2, customerId);
             return pstmt.executeUpdate() > 0;
@@ -162,12 +227,11 @@ public class CustomerDAL {
         }
     }
 
-    public boolean updateTime(int customerId, int minutes) {
+    public boolean updateTime(int customerId, int newTime) {
         String sql = "UPDATE Customers SET RemainingTimeMinutes = ? WHERE CustomerID = ?";
         try (Connection conn = DatabaseHelper.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
-            pstmt.setInt(1, minutes);
+            pstmt.setInt(1, newTime);
             pstmt.setInt(2, customerId);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {

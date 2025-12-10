@@ -14,6 +14,7 @@ public class UserManagementPanel extends JPanel {
     private UserService userService;
     private JTable userTable;
     private DefaultTableModel tableModel;
+    private JCheckBox showDeletedChk;
 
     public UserManagementPanel() {
         userService = new UserService();
@@ -31,6 +32,10 @@ public class UserManagementPanel extends JPanel {
         JButton statusButton = createToolbarButton("Khóa/Mở khóa", new Color(241, 196, 15));
         JButton pwdButton = createToolbarButton("Đổi mật khẩu", null);
         JButton refreshButton = createToolbarButton("Làm mới", null);
+        
+        showDeletedChk = new JCheckBox("Hiện tài khoản đã xóa");
+        showDeletedChk.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        showDeletedChk.addActionListener(e -> loadData());
 
         addButton.addActionListener(e -> showAddDialog());
         editButton.addActionListener(e -> showEditDialog());
@@ -50,6 +55,8 @@ public class UserManagementPanel extends JPanel {
         toolBar.add(pwdButton);
         toolBar.addSeparator(new Dimension(10, 0));
         toolBar.add(refreshButton);
+        toolBar.addSeparator(new Dimension(10, 0));
+        toolBar.add(showDeletedChk);
         
         add(toolBar, BorderLayout.NORTH);
 
@@ -86,14 +93,25 @@ public class UserManagementPanel extends JPanel {
 
     private void loadData() {
         tableModel.setRowCount(0);
-        List<User> list = userService.getAllUsers();
+        boolean showDeleted = showDeletedChk.isSelected();
+        List<User> list = userService.getAllUsers(showDeleted);
         for (User u : list) {
+            // Double check to ensure deleted users are hidden if checkbox is unchecked
+            if (!showDeleted && u.isDeleted()) {
+                continue;
+            }
+            
+            String status = u.isActive() ? "Hoạt động" : "Đã khóa";
+            if (u.isDeleted()) {
+                status = "Đã xóa";
+            }
+
             tableModel.addRow(new Object[]{
                 u.getUserId(),
                 u.getUsername(),
                 u.getEmail(),
                 u.getRoleName(),
-                u.isActive() ? "Hoạt động" : "Đã khóa"
+                status
             });
         }
     }
@@ -131,12 +149,13 @@ public class UserManagementPanel extends JPanel {
         saveButton.setForeground(Color.WHITE);
         
         saveButton.addActionListener(e -> {
-            if (userService.addUser(usernameField.getText(), new String(passwordField.getPassword()), emailField.getText(), (String) roleBox.getSelectedItem())) {
+            try {
+                userService.addUser(usernameField.getText(), new String(passwordField.getPassword()), emailField.getText(), (String) roleBox.getSelectedItem());
                 JOptionPane.showMessageDialog(dialog, "Thêm thành công!");
                 dialog.dispose();
                 loadData();
-            } else {
-                JOptionPane.showMessageDialog(dialog, "Thêm thất bại (Tài khoản đã tồn tại?).");
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(dialog, ex.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
             }
         });
 
@@ -208,12 +227,13 @@ public class UserManagementPanel extends JPanel {
             u.setEmail(emailField.getText());
             u.setActive(isActive); // Keep current status
             
-            if (userService.updateUser(u, (String) roleBox.getSelectedItem())) {
+            try {
+                userService.updateUser(u, (String) roleBox.getSelectedItem());
                 JOptionPane.showMessageDialog(dialog, "Cập nhật thành công!");
                 dialog.dispose();
                 loadData();
-            } else {
-                JOptionPane.showMessageDialog(dialog, "Cập nhật thất bại.");
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(dialog, ex.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
             }
         });
 

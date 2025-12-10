@@ -14,6 +14,7 @@ public class Customer {
     // Extra fields for display
     private String username;
     private String email;
+    private String currentMachine;
 
     public Customer() {}
 
@@ -53,4 +54,7 @@ public class Customer {
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+
+    public String getCurrentMachine() { return currentMachine; }
+    public void setCurrentMachine(String currentMachine) { this.currentMachine = currentMachine; }
 }

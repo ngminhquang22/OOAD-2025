@@ -21,9 +21,10 @@ if (Test-Path $localLibJar) {
     Write-Host "Warning: MySQL Driver not found! Database connection will fail." -ForegroundColor Red
 }
 
-if (-not (Test-Path "bin")) {
-    New-Item -ItemType Directory -Path "bin" | Out-Null
+if (Test-Path "bin") {
+    Remove-Item -Path "bin" -Recurse -Force
 }
+New-Item -ItemType Directory -Path "bin" | Out-Null
 
 Write-Host "Compiling..." -ForegroundColor Cyan
 # Need to include classpath during compilation too

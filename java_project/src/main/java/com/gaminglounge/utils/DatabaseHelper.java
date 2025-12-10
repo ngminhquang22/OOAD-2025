@@ -45,7 +45,15 @@ public class DatabaseHelper {
                         "RoleID INT NOT NULL, " +
                         "CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP, " +
                         "IsActive BIT DEFAULT 1, " +
+                        "IsDeleted BIT DEFAULT 0, " +
                         "FOREIGN KEY (RoleID) REFERENCES Roles(RoleID))");
+                
+                // Migration: Add IsDeleted column if not exists
+                try {
+                    stmt.execute("ALTER TABLE Users ADD COLUMN IsDeleted BIT DEFAULT 0");
+                } catch (SQLException e) {
+                    // Column likely exists, ignore
+                }
 
                 // 3. Customers
                 stmt.execute("CREATE TABLE IF NOT EXISTS Customers (" +
@@ -160,6 +168,16 @@ public class DatabaseHelper {
                         "StaffID INT NOT NULL, " +
                         "CheckInTime DATETIME DEFAULT CURRENT_TIMESTAMP, " +
                         "CheckOutTime DATETIME, " +
+                        "Note VARCHAR(255), " +
+                        "FOREIGN KEY (StaffID) REFERENCES Staff(StaffID))");
+
+                // 13.5 WorkSchedules (New for Shift Management by Date)
+                stmt.execute("CREATE TABLE IF NOT EXISTS WorkSchedules (" +
+                        "ScheduleID INT PRIMARY KEY AUTO_INCREMENT, " +
+                        "StaffID INT NOT NULL, " +
+                        "WorkDate DATE NOT NULL, " +
+                        "ShiftStart TIME NOT NULL, " +
+                        "ShiftEnd TIME NOT NULL, " +
                         "Note VARCHAR(255), " +
                         "FOREIGN KEY (StaffID) REFERENCES Staff(StaffID))");
 

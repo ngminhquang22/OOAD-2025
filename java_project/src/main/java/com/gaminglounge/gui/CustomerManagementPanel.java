@@ -1,23 +1,52 @@
 package com.gaminglounge.gui;
 
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Frame;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.math.BigDecimal;
 import java.util.List;
 
-import javax.swing.*;
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JPasswordField;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.JToolBar;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 
 import com.gaminglounge.bll.CustomerService;
+import com.gaminglounge.bll.StaffService;
 import com.gaminglounge.model.Customer;
+import com.gaminglounge.model.Staff;
+import com.gaminglounge.model.User;
 
 public class CustomerManagementPanel extends JPanel {
     private CustomerService customerService;
+    private StaffService staffService;
+    private User currentUser;
     private JTable customerTable;
     private DefaultTableModel tableModel;
 
-    public CustomerManagementPanel() {
-        customerService = new CustomerService();
+    public CustomerManagementPanel(User user) {
+        this.currentUser = user;
+        this.customerService = new CustomerService();
+        this.staffService = new StaffService();
+        
         setLayout(new BorderLayout());
         setBorder(new EmptyBorder(10, 10, 10, 10));
 
@@ -30,13 +59,17 @@ public class CustomerManagementPanel extends JPanel {
         JButton editButton = createToolbarButton("Sửa", null);
         JButton deleteButton = createToolbarButton("Xóa", new Color(231, 76, 60));
         JButton refreshButton = createToolbarButton("Làm mới", null);
-        JButton topUpButton = createToolbarButton("Nạp tài khoản", new Color(46, 204, 113));
+        JButton topUpButton = createToolbarButton("Nạp tiền", new Color(46, 204, 113));
+        JButton extendButton = createToolbarButton("Gia hạn", new Color(155, 89, 182));
+        JButton chatButton = createToolbarButton("Chat", new Color(241, 196, 15));
 
         addButton.addActionListener(e -> showAddDialog());
         editButton.addActionListener(e -> showEditDialog());
         deleteButton.addActionListener(e -> deleteCustomer());
         refreshButton.addActionListener(e -> loadData());
         topUpButton.addActionListener(e -> showTopUpDialog());
+        extendButton.addActionListener(e -> showExtendDialog());
+        chatButton.addActionListener(e -> showChatDialog());
 
         toolBar.add(addButton);
         toolBar.addSeparator(new Dimension(10, 0));
@@ -47,11 +80,15 @@ public class CustomerManagementPanel extends JPanel {
         toolBar.add(refreshButton);
         toolBar.addSeparator(new Dimension(20, 0));
         toolBar.add(topUpButton);
+        toolBar.addSeparator(new Dimension(10, 0));
+        toolBar.add(extendButton);
+        toolBar.addSeparator(new Dimension(10, 0));
+        toolBar.add(chatButton);
         
         add(toolBar, BorderLayout.NORTH);
 
         // Table
-        String[] columnNames = {"ID", "Họ tên", "Tài khoản", "Email", "SĐT", "Số dư", "Hạng TV", "Giờ còn lại"};
+        String[] columnNames = {"ID", "Họ tên", "Tài khoản", "Email", "SĐT", "Số dư", "Hạng TV", "Giờ còn lại", "Máy đang dùng"};
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -93,7 +130,8 @@ public class CustomerManagementPanel extends JPanel {
                 c.getPhoneNumber(),
                 c.getBalance(),
                 c.getMembershipLevel(),
-                formatTime(c.getRemainingTimeMinutes())
+                formatTime(c.getRemainingTimeMinutes()),
+                c.getCurrentMachine() == null ? "" : c.getCurrentMachine()
             });
         }
     }
@@ -283,26 +321,21 @@ public class CustomerManagementPanel extends JPanel {
         }
         int customerId = (int) tableModel.getValueAt(selectedRow, 0);
         
-        String input = JOptionPane.showInputDialog(this, "Nhập số tiền nạp (8000đ = 1 giờ):", "8000");
+        String input = JOptionPane.showInputDialog(this, "Nhập số tiền nạp vào tài khoản:", "50000");
         if (input != null && !input.isEmpty()) {
             try {
-                double amount = Double.parseDouble(input);
-                int minutesToAdd = (int) ((amount / 8000) * 60);
+                BigDecimal amount = new BigDecimal(input);
                 
                 int confirm = JOptionPane.showConfirmDialog(this, 
-                    String.format("Khách nạp %.0f VNĐ.\nQuy đổi: %d phút.\nĐồng ý?", amount, minutesToAdd),
+                    String.format("Nạp %.0f VNĐ vào tài khoản khách hàng?\nĐồng ý?", amount),
                     "Xác nhận nạp tiền", JOptionPane.YES_NO_OPTION);
                 
                 if (confirm == JOptionPane.YES_OPTION) {
-                    // Fetch current time from table (formatted HH:mm:ss)
-                    String timeStr = (String) tableModel.getValueAt(selectedRow, 7);
-                    String[] parts = timeStr.split(":");
-                    int currentMinutes = Integer.parseInt(parts[0]) * 60 + Integer.parseInt(parts[1]);
+                    Staff currentStaff = staffService.getStaffByUserId(currentUser.getUserId());
+                    int staffId = (currentStaff != null) ? currentStaff.getStaffId() : 1; // Fallback to 1 for testing if Admin has no staff record
                     
-                    // Use processTimeTopUp to record transaction
-                    // TODO: Pass actual logged-in staff ID. Using 1 (Admin) for now.
-                    if (customerService.processTimeTopUp(customerId, currentMinutes, minutesToAdd, BigDecimal.valueOf(amount), 1)) {
-                        JOptionPane.showMessageDialog(this, "Nạp tiền thành công! (Đã cộng giờ và lưu giao dịch)");
+                    if (customerService.topUp(customerId, amount, staffId, "Nạp tiền tại quầy")) {
+                        JOptionPane.showMessageDialog(this, "Nạp tiền thành công!");
                         loadData();
                     } else {
                         JOptionPane.showMessageDialog(this, "Nạp tiền thất bại.");
@@ -310,6 +343,64 @@ public class CustomerManagementPanel extends JPanel {
                 }
             } catch (NumberFormatException e) {
                 JOptionPane.showMessageDialog(this, "Số tiền không hợp lệ.");
+            }
+        }
+    }
+
+    private void showExtendDialog() {
+        int selectedRow = customerTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Vui lòng chọn khách hàng để gia hạn.");
+            return;
+        }
+        int customerId = (int) tableModel.getValueAt(selectedRow, 0);
+        
+        String input = JOptionPane.showInputDialog(this, "Nhập số tiền mua giờ (8000đ = 1 giờ):", "8000");
+        if (input != null && !input.isEmpty()) {
+            try {
+                double amountVal = Double.parseDouble(input);
+                int minutesToAdd = (int) ((amountVal / 8000) * 60);
+                BigDecimal amount = BigDecimal.valueOf(amountVal);
+                
+                int confirm = JOptionPane.showConfirmDialog(this, 
+                    String.format("Khách trả %.0f VNĐ.\nQuy đổi: %d phút.\nĐồng ý?", amountVal, minutesToAdd),
+                    "Xác nhận gia hạn", JOptionPane.YES_NO_OPTION);
+                
+                if (confirm == JOptionPane.YES_OPTION) {
+                    Staff currentStaff = staffService.getStaffByUserId(currentUser.getUserId());
+                    int staffId = (currentStaff != null) ? currentStaff.getStaffId() : 1;
+                    
+                    if (customerService.extendService(customerId, minutesToAdd, amount, staffId)) {
+                        JOptionPane.showMessageDialog(this, "Gia hạn thành công!");
+                        loadData();
+                    } else {
+                        JOptionPane.showMessageDialog(this, "Gia hạn thất bại.");
+                    }
+                }
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this, "Số tiền không hợp lệ.");
+            }
+        }
+    }
+
+    private void showChatDialog() {
+        int selectedRow = customerTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Vui lòng chọn khách hàng để chat.");
+            return;
+        }
+        int customerId = (int) tableModel.getValueAt(selectedRow, 0);
+        String customerName = (String) tableModel.getValueAt(selectedRow, 1);
+        
+        String message = JOptionPane.showInputDialog(this, "Gửi tin nhắn đến " + customerName + ":");
+        if (message != null && !message.trim().isEmpty()) {
+            Staff currentStaff = staffService.getStaffByUserId(currentUser.getUserId());
+            int staffId = (currentStaff != null) ? currentStaff.getStaffId() : 1;
+            
+            if (customerService.sendMessage(customerId, staffId, message)) {
+                JOptionPane.showMessageDialog(this, "Đã gửi tin nhắn.");
+            } else {
+                JOptionPane.showMessageDialog(this, "Gửi tin nhắn thất bại.");
             }
         }
     }

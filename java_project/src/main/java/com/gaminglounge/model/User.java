@@ -8,6 +8,7 @@ public class User {
     private int roleId;
     private String roleName; // Joined from Roles table
     private boolean isActive;
+    private boolean isDeleted;
 
     public User() {}
 
@@ -19,6 +20,7 @@ public class User {
         this.roleId = roleId;
         this.roleName = roleName;
         this.isActive = true;
+        this.isDeleted = false;
     }
 
     public int getUserId() { return userId; }
@@ -41,4 +43,7 @@ public class User {
 
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { isActive = active; }
+
+    public boolean isDeleted() { return isDeleted; }
+    public void setDeleted(boolean deleted) { isDeleted = deleted; }
 }

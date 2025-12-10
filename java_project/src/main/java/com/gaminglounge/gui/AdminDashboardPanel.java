@@ -7,6 +7,7 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Window;
@@ -28,14 +29,23 @@ import javax.swing.JScrollPane;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.JTable;
 
 import com.gaminglounge.bll.ComputerService;
+import com.gaminglounge.bll.WorkScheduleService;
 import com.gaminglounge.model.Computer;
 import com.gaminglounge.model.User;
+import com.gaminglounge.model.WorkSchedule;
+
+import java.util.Calendar;
+import java.util.Date;
+import java.text.SimpleDateFormat;
 
 public class AdminDashboardPanel extends JPanel {
     private User currentUser;
     private ComputerService computerService;
+    private WorkScheduleService workScheduleService;
     
     // Layout Components
     private JPanel sidebarPanel;
@@ -51,6 +61,7 @@ public class AdminDashboardPanel extends JPanel {
         this.currentUser = user;
         System.out.println("Logged in as: " + user.getUsername() + ", RoleID: " + user.getRoleId() + ", RoleName: " + user.getRoleName());
         this.computerService = new ComputerService();
+        this.workScheduleService = new WorkScheduleService();
         this.navButtons = new HashMap<>();
 
         setLayout(new BorderLayout());
@@ -125,6 +136,8 @@ public class AdminDashboardPanel extends JPanel {
 
         if (isAdmin) {
             addNavButton("Tổng quan", "OVERVIEW");
+        } else {
+            addNavButton("Lịch làm việc", "MY_SCHEDULE");
         }
         
         addNavButton("Máy tính", "COMPUTERS");
@@ -183,6 +196,8 @@ public class AdminDashboardPanel extends JPanel {
         // 1. Overview Panel
         if (isAdmin) {
             contentPanel.add(createOverviewPanel(), "OVERVIEW");
+        } else {
+            contentPanel.add(createMySchedulePanel(), "MY_SCHEDULE");
         }
 
         // 2. Computers Panel
@@ -195,7 +210,7 @@ public class AdminDashboardPanel extends JPanel {
 
         // 4. Customers Panel
         if (isAdmin) {
-            contentPanel.add(new CustomerManagementPanel(), "CUSTOMERS");
+            contentPanel.add(new CustomerManagementPanel(currentUser), "CUSTOMERS");
         }
 
         // 5. Users Panel
@@ -208,7 +223,7 @@ public class AdminDashboardPanel extends JPanel {
 
         // 7. Inventory
         contentPanel.add(new InventoryManagementPanel(currentUser), "INVENTORY");
-        contentPanel.add(createPlaceholderPanel("Báo cáo Thống kê"), "REPORTS");
+        contentPanel.add(new StatisticsPanel(), "REPORTS");
     }
 
     private JPanel createOverviewPanel() {
@@ -258,11 +273,23 @@ public class AdminDashboardPanel extends JPanel {
         JLabel title = new JLabel("Danh sách máy trạm");
         title.setFont(new Font("Segoe UI", Font.BOLD, 20));
         
+        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        
+        if (currentUser.getRoleId() == 1) { // Admin
+            JButton addBtn = new JButton("Thêm máy");
+            addBtn.setBackground(new Color(46, 204, 113));
+            addBtn.setForeground(Color.WHITE);
+            addBtn.setFocusPainted(false);
+            addBtn.addActionListener(e -> showComputerDialog(null));
+            actionPanel.add(addBtn);
+        }
+
         JButton refreshBtn = new JButton("Làm mới");
         refreshBtn.addActionListener(e -> refreshComputers());
+        actionPanel.add(refreshBtn);
         
         topBar.add(title, BorderLayout.WEST);
-        topBar.add(refreshBtn, BorderLayout.EAST);
+        topBar.add(actionPanel, BorderLayout.EAST);
         topBar.setBorder(new EmptyBorder(0, 0, 15, 0));
         panel.add(topBar, BorderLayout.NORTH);
 
@@ -280,6 +307,164 @@ public class AdminDashboardPanel extends JPanel {
         label.setFont(new Font("Segoe UI", Font.ITALIC, 18));
         label.setForeground(Color.GRAY);
         panel.add(label);
+        return panel;
+    }
+
+    private JPanel createMySchedulePanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        
+        // Header
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(Color.WHITE);
+        header.setBorder(new EmptyBorder(15, 15, 15, 15));
+        
+        JLabel title = new JLabel("Lịch làm việc của tôi");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        header.add(title, BorderLayout.WEST);
+        
+        // Week Navigation
+        JPanel navPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        navPanel.setOpaque(false);
+        
+        JButton prevBtn = new JButton("< Tuần trước");
+        JLabel weekLabel = new JLabel();
+        weekLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        weekLabel.setBorder(new EmptyBorder(0, 15, 0, 15));
+        JButton nextBtn = new JButton("Tuần sau >");
+        
+        navPanel.add(prevBtn);
+        navPanel.add(weekLabel);
+        navPanel.add(nextBtn);
+        header.add(navPanel, BorderLayout.EAST);
+        
+        panel.add(header, BorderLayout.NORTH);
+        
+        // Timetable
+        String[] columnNames = {"Ca / Thứ", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"};
+        DefaultTableModel model = new DefaultTableModel(columnNames, 3) {
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
+        };
+        
+        JTable table = new JTable(model);
+        table.setRowHeight(120);
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
+        table.getTableHeader().setBackground(new Color(230, 240, 255));
+        table.getTableHeader().setPreferredSize(new Dimension(0, 40));
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        table.setGridColor(new Color(200, 200, 200));
+        table.setShowGrid(true);
+        table.setIntercellSpacing(new Dimension(1, 1));
+        
+        // Use JTextArea renderer for multiline
+        table.setDefaultRenderer(Object.class, new javax.swing.table.TableCellRenderer() {
+            javax.swing.JTextArea textArea = new javax.swing.JTextArea();
+            {
+                textArea.setLineWrap(true);
+                textArea.setWrapStyleWord(true);
+                textArea.setOpaque(true);
+                textArea.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+            }
+            public Component getTableCellRendererComponent(JTable t, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                if (isSelected) {
+                    textArea.setForeground(t.getSelectionForeground());
+                    textArea.setBackground(t.getSelectionBackground());
+                } else {
+                    textArea.setForeground(Color.BLACK);
+                    textArea.setBackground(Color.WHITE);
+                    if (column == 0) {
+                        textArea.setBackground(new Color(245, 245, 245));
+                        textArea.setFont(new Font("Segoe UI", Font.BOLD, 13));
+                    } else {
+                        textArea.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+                        // Highlight if shift exists
+                        if (value != null && !value.toString().isEmpty()) {
+                            textArea.setBackground(new Color(220, 255, 220)); // Light Green for assigned shifts
+                        }
+                    }
+                }
+                textArea.setText((value == null) ? "" : value.toString());
+                return textArea;
+            }
+        });
+        
+        panel.add(new JScrollPane(table), BorderLayout.CENTER);
+        
+        // Logic
+        Calendar currentWeekStart = Calendar.getInstance();
+        currentWeekStart.setFirstDayOfWeek(Calendar.MONDAY);
+        currentWeekStart.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
+        
+        Runnable loadSchedule = () -> {
+            // Update Label
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+            Calendar endOfWeek = (Calendar) currentWeekStart.clone();
+            endOfWeek.add(Calendar.DAY_OF_YEAR, 6);
+            weekLabel.setText("Tuần: " + sdf.format(currentWeekStart.getTime()) + " - " + sdf.format(endOfWeek.getTime()));
+            
+            // Update Headers
+            Calendar cal = (Calendar) currentWeekStart.clone();
+            String[] days = {"Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"};
+            SimpleDateFormat daySdf = new SimpleDateFormat("dd/MM");
+            
+            table.getColumnModel().getColumn(0).setHeaderValue("Ca / Thứ");
+            for (int i = 0; i < 7; i++) {
+                table.getColumnModel().getColumn(i + 1).setHeaderValue(days[i] + " (" + daySdf.format(cal.getTime()) + ")");
+                cal.add(Calendar.DAY_OF_YEAR, 1);
+            }
+            table.getTableHeader().repaint();
+            
+            // Clear
+            for (int r = 0; r < 3; r++) {
+                for (int c = 1; c <= 7; c++) {
+                    model.setValueAt("", r, c);
+                }
+            }
+            model.setValueAt("Ca Sáng\n(07:00 - 15:00)", 0, 0);
+            model.setValueAt("Ca Chiều\n(15:00 - 23:00)", 1, 0);
+            model.setValueAt("Ca Đêm\n(23:00 - 07:00)", 2, 0);
+            
+            // Fetch Data
+            java.sql.Date startDate = new java.sql.Date(currentWeekStart.getTimeInMillis());
+            java.sql.Date endDate = new java.sql.Date(endOfWeek.getTimeInMillis());
+            List<WorkSchedule> schedules = workScheduleService.getSchedulesByDateRange(startDate, endDate);
+            
+            for (WorkSchedule ws : schedules) {
+                // Filter for current user
+                if (ws.getStaffId() != currentUser.getUserId()) continue;
+                
+                Calendar wsCal = Calendar.getInstance();
+                wsCal.setTime(ws.getWorkDate());
+                long diff = ws.getWorkDate().getTime() - startDate.getTime();
+                int dayIndex = (int) (diff / (1000 * 60 * 60 * 24)) + 1;
+                
+                if (dayIndex < 1 || dayIndex > 7) continue;
+                
+                int rowIndex = -1;
+                int startHour = Integer.parseInt(ws.getShiftStart().toString().split(":")[0]);
+                if (startHour >= 6 && startHour < 14) rowIndex = 0;
+                else if (startHour >= 14 && startHour < 22) rowIndex = 1;
+                else rowIndex = 2;
+                
+                if (rowIndex != -1) {
+                    String note = (ws.getNote() != null) ? ws.getNote() : "";
+                    model.setValueAt("Đã phân công\n" + note, rowIndex, dayIndex);
+                }
+            }
+        };
+        
+        prevBtn.addActionListener(e -> {
+            currentWeekStart.add(Calendar.WEEK_OF_YEAR, -1);
+            loadSchedule.run();
+        });
+        
+        nextBtn.addActionListener(e -> {
+            currentWeekStart.add(Calendar.WEEK_OF_YEAR, 1);
+            loadSchedule.run();
+        });
+        
+        loadSchedule.run();
+        
         return panel;
     }
 
@@ -357,9 +542,35 @@ public class AdminDashboardPanel extends JPanel {
 
             // Context Menu
             JPopupMenu contextMenu = new JPopupMenu();
-            JMenuItem toggleItem = new JMenuItem("Chuyển đổi trạng thái");
-            toggleItem.addActionListener(e -> togglePC(pc));
-            contextMenu.add(toggleItem);
+            
+            JMenuItem openItem = new JMenuItem("Mở máy");
+            openItem.addActionListener(e -> updatePCStatus(pc, "Đang sử dụng"));
+            
+            JMenuItem lockItem = new JMenuItem("Khóa máy");
+            lockItem.addActionListener(e -> updatePCStatus(pc, "Trống"));
+            
+            JMenuItem brokenItem = new JMenuItem("Báo hỏng");
+            brokenItem.addActionListener(e -> updatePCStatus(pc, "Hỏng"));
+            
+            JMenuItem maintainItem = new JMenuItem("Bảo trì");
+            maintainItem.addActionListener(e -> updatePCStatus(pc, "Bảo trì"));
+
+            contextMenu.add(openItem);
+            contextMenu.add(lockItem);
+            contextMenu.addSeparator();
+            contextMenu.add(brokenItem);
+            contextMenu.add(maintainItem);
+            
+            if (currentUser.getRoleId() == 1) { // Admin
+                contextMenu.addSeparator();
+                JMenuItem editItem = new JMenuItem("Sửa thông tin");
+                editItem.addActionListener(e -> showComputerDialog(pc));
+                contextMenu.add(editItem);
+                
+                JMenuItem deleteItem = new JMenuItem("Xóa máy");
+                deleteItem.addActionListener(e -> deleteComputer(pc));
+                contextMenu.add(deleteItem);
+            }
             
             pcCard.setComponentPopupMenu(contextMenu);
             
@@ -382,9 +593,119 @@ public class AdminDashboardPanel extends JPanel {
         computersPanel.repaint();
     }
 
+    private void updatePCStatus(Computer pc, String status) {
+        // a3. Permission check for "Hỏng" (Broken) - Only Admin (RoleID 1) can mark as broken
+        if ("Hỏng".equals(status) && currentUser.getRoleId() != 1) {
+             javax.swing.JOptionPane.showMessageDialog(this, "Bạn không có quyền thực hiện thao tác này.");
+             return;
+        }
+
+        try {
+            boolean success = computerService.setComputerStatus(pc.getComputerId(), status);
+            if (!success) {
+                // a1. Device not found
+                javax.swing.JOptionPane.showMessageDialog(this, "Thiết bị không tồn tại hoặc chưa được đăng ký.");
+            }
+            refreshComputers();
+        } catch (java.sql.SQLException e) {
+            e.printStackTrace();
+            // a2. Connection error
+            javax.swing.JOptionPane.showMessageDialog(this, "Mất kết nối với máy, không thể thực hiện thao tác.");
+        } catch (Exception e) {
+            // a4. General failure
+             javax.swing.JOptionPane.showMessageDialog(this, "Thao tác không thành công do lỗi mạng hoặc phần mềm quản lý.");
+        }
+    }
+
     private void togglePC(Computer pc) {
-        computerService.toggleComputerStatus(pc.getComputerId(), pc.getStatus());
-        refreshComputers();
+        try {
+            String newStatus = computerService.toggleComputerStatus(pc.getComputerId(), pc.getStatus());
+            if (newStatus == null) {
+                 // a1. Device not found
+                 javax.swing.JOptionPane.showMessageDialog(this, "Thiết bị không tồn tại hoặc chưa được đăng ký.");
+            }
+            refreshComputers();
+        } catch (java.sql.SQLException e) {
+             // a2. Connection error
+             javax.swing.JOptionPane.showMessageDialog(this, "Mất kết nối với máy, không thể thực hiện thao tác.");
+        } catch (Exception e) {
+             // a4. General failure
+             javax.swing.JOptionPane.showMessageDialog(this, "Thao tác không thành công do lỗi mạng hoặc phần mềm quản lý.");
+        }
+    }
+
+    private void deleteComputer(Computer pc) {
+        int confirm = javax.swing.JOptionPane.showConfirmDialog(this, 
+            "Bạn có chắc muốn xóa máy " + pc.getComputerName() + "?", 
+            "Xác nhận xóa", javax.swing.JOptionPane.YES_NO_OPTION);
+            
+        if (confirm == javax.swing.JOptionPane.YES_OPTION) {
+            if (computerService.deleteComputer(pc.getComputerId())) {
+                refreshComputers();
+            } else {
+                javax.swing.JOptionPane.showMessageDialog(this, "Không thể xóa máy này (có thể đang có phiên hoạt động).");
+            }
+        }
+    }
+
+    private void showComputerDialog(Computer pc) {
+        javax.swing.JDialog dialog = new javax.swing.JDialog((java.awt.Frame) SwingUtilities.getWindowAncestor(this), 
+            pc == null ? "Thêm máy mới" : "Sửa thông tin máy", true);
+        dialog.setLayout(new GridBagLayout());
+        dialog.setSize(350, 200);
+        dialog.setLocationRelativeTo(this);
+        
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new java.awt.Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        javax.swing.JTextField nameField = new javax.swing.JTextField(20);
+        javax.swing.JTextField locationField = new javax.swing.JTextField(20);
+        
+        if (pc != null) {
+            nameField.setText(pc.getComputerName());
+            locationField.setText(pc.getLocation());
+        }
+        
+        gbc.gridx = 0; gbc.gridy = 0; dialog.add(new JLabel("Tên máy:"), gbc);
+        gbc.gridx = 1; dialog.add(nameField, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1; dialog.add(new JLabel("Vị trí:"), gbc);
+        gbc.gridx = 1; dialog.add(locationField, gbc);
+        
+        JButton saveBtn = new JButton("Lưu");
+        saveBtn.addActionListener(e -> {
+            String name = nameField.getText().trim();
+            String loc = locationField.getText().trim();
+            
+            if (name.isEmpty()) {
+                javax.swing.JOptionPane.showMessageDialog(dialog, "Tên máy không được để trống.");
+                return;
+            }
+            
+            Computer c = (pc == null) ? new Computer() : pc;
+            c.setComputerName(name);
+            c.setLocation(loc);
+            
+            boolean success;
+            if (pc == null) {
+                c.setStatus("Trống");
+                success = computerService.addComputer(c);
+            } else {
+                success = computerService.updateComputer(c);
+            }
+            
+            if (success) {
+                dialog.dispose();
+                refreshComputers();
+            } else {
+                javax.swing.JOptionPane.showMessageDialog(dialog, "Lưu thất bại.");
+            }
+        });
+        
+        gbc.gridx = 1; gbc.gridy = 2; dialog.add(saveBtn, gbc);
+        
+        dialog.setVisible(true);
     }
 
     private void logout() {

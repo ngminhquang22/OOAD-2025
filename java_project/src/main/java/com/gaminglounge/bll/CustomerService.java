@@ -41,30 +41,19 @@ public class CustomerService {
     }
 
     public boolean topUp(int customerId, BigDecimal amount, int staffId, String note) {
-        // 1. Get current balance (we need to fetch fresh to be safe, or assume caller knows)
-        // Let's fetch fresh.
-        // Since we don't have getById(customerId) exposed efficiently, we might rely on caller or add it.
-        // But wait, updateBalance just sets the value.
-        // We should probably use a "addToBalance" method in DAL to be atomic, but for now:
-        // We will assume the caller has the correct "newBalance" or we fetch it.
-        // Let's just use updateBalance with (current + amount).
-        // But I don't have current balance here.
-        // I'll implement a simple getBalance in DAL or just fetch the customer.
-        // For now, I'll assume the caller calls this method INSTEAD of updateBalance for TopUps.
-        // But I need the current balance to calculate new balance.
-        
-        // Let's add getCustomerById to DAL first? Or just iterate getAllCustomers? No, inefficient.
-        // I'll add getCustomerById to CustomerDAL.
-        
-        // Actually, let's just do it in the GUI for now to minimize changes, 
-        // OR better: The GUI already has the current balance.
-        // So I will change this method signature to:
-        // topUp(int customerId, BigDecimal currentBalance, BigDecimal amount, int staffId, String note)
-        
-        BigDecimal newBalance = amount; // Placeholder if we don't have current.
-        // Wait, if I pass currentBalance, I can calculate new.
-        
-        return false; // Placeholder
+        Customer c = customerDAL.getCustomerById(customerId);
+        if (c == null) return false;
+        return processTopUp(customerId, c.getBalance(), amount, staffId, note);
+    }
+
+    public boolean extendService(int customerId, int minutes, BigDecimal cost, int staffId) {
+        Customer c = customerDAL.getCustomerById(customerId);
+        if (c == null) return false;
+        return processTimeTopUp(customerId, c.getRemainingTimeMinutes(), minutes, cost, staffId);
+    }
+
+    public boolean sendMessage(int customerId, int senderUserId, String content) {
+        return customerDAL.sendSupportMessage(customerId, senderUserId, content);
     }
     
     public boolean processTopUp(int customerId, BigDecimal currentBalance, BigDecimal amount, int staffId, String note) {
@@ -99,5 +88,24 @@ public class CustomerService {
 
     public boolean updateTime(int customerId, int minutes) {
         return customerDAL.updateTime(customerId, minutes);
+    }
+
+    public boolean chargeCustomer(int customerId, BigDecimal amount, int staffId, String note) {
+        Customer c = customerDAL.getCustomerById(customerId);
+        if (c == null) return false;
+        if (c.getBalance().compareTo(amount) < 0) return false; // Not enough balance
+
+        BigDecimal newBalance = c.getBalance().subtract(amount);
+        if (customerDAL.updateBalance(customerId, newBalance)) {
+            Transaction t = new Transaction();
+            t.setCustomerId(customerId);
+            t.setStaffId(staffId);
+            t.setAmount(amount.negate()); // Negative amount for deduction
+            t.setTransactionType("Thanh toán");
+            t.setNote(note);
+            transactionDAL.addTransaction(t);
+            return true;
+        }
+        return false;
     }
 }

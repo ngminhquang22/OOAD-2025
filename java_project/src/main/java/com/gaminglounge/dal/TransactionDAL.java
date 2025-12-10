@@ -1,10 +1,16 @@
 package com.gaminglounge.dal;
 
-import com.gaminglounge.model.Transaction;
-import com.gaminglounge.utils.DatabaseHelper;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.gaminglounge.model.Transaction;
+import com.gaminglounge.utils.DatabaseHelper;
 
 public class TransactionDAL {
 
@@ -60,5 +66,42 @@ public class TransactionDAL {
             e.printStackTrace();
             return false;
         }
+    }
+
+    public List<Transaction> searchTransactions(String keyword) {
+        List<Transaction> list = new ArrayList<>();
+        String sql = "SELECT t.*, c.FullName as CustomerName, s.FullName as StaffName " +
+                     "FROM Transactions t " +
+                     "JOIN Customers c ON t.CustomerID = c.CustomerID " +
+                     "LEFT JOIN Staff s ON t.StaffID = s.StaffID " +
+                     "WHERE c.FullName LIKE ? OR t.TransactionID LIKE ? " +
+                     "ORDER BY t.TransactionDate DESC";
+        
+        try (Connection conn = DatabaseHelper.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
+            String searchPattern = "%" + keyword + "%";
+            pstmt.setString(1, searchPattern);
+            pstmt.setString(2, searchPattern);
+            
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Transaction t = new Transaction(
+                    rs.getInt("TransactionID"),
+                    rs.getInt("CustomerID"),
+                    rs.getInt("StaffID"),
+                    rs.getBigDecimal("Amount"),
+                    rs.getTimestamp("TransactionDate"),
+                    rs.getString("TransactionType"),
+                    rs.getString("Note")
+                );
+                t.setCustomerName(rs.getString("CustomerName"));
+                t.setStaffName(rs.getString("StaffName"));
+                list.add(t);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
     }
 }

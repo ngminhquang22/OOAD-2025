@@ -79,10 +79,8 @@ public class InventoryManagementPanel extends JPanel {
 
         tabbedPane.addTab("Danh sách sản phẩm", createProductListPanel());
         
-        // Only Staff (RoleID != 1) can Import/Export
-        if (currentUser.getRoleId() != 1) {
-            tabbedPane.addTab("Nhập / Xuất kho", createImportExportPanel());
-        }
+        // Allow both Admin and Staff to Import/Export
+        tabbedPane.addTab("Nhập / Xuất kho", createImportExportPanel());
         
         tabbedPane.addTab("Lịch sử kho", createHistoryPanel());
 
@@ -267,6 +265,13 @@ public class InventoryManagementPanel extends JPanel {
         updateProductCombo();
         quantitySpinner = new JSpinner(new SpinnerNumberModel(1, 1, 1000, 1));
         priceField = new JTextField("0"); // Unit Price (Import only)
+        
+        // Auto-calculate import price (60% of selling price)
+        productCombo.addActionListener(e -> updateImportPrice());
+        typeCombo.addActionListener(e -> updateImportPrice());
+        // Initial calculation
+        updateImportPrice();
+
         noteArea = new JTextArea(3, 20);
 
         JButton addItemBtn = new JButton("Thêm vào phiếu");
@@ -324,6 +329,20 @@ public class InventoryManagementPanel extends JPanel {
             if (!p.isService()) { // Only physical products
                 productCombo.addItem(p);
             }
+        }
+    }
+
+    private void updateImportPrice() {
+        if (typeCombo != null && "Import".equals(typeCombo.getSelectedItem())) {
+            Product selectedProduct = (Product) productCombo.getSelectedItem();
+            if (selectedProduct != null && priceField != null) {
+                BigDecimal sellingPrice = selectedProduct.getPrice();
+                // Import price is 40% less than selling price (i.e., 60% of selling price)
+                BigDecimal importPrice = sellingPrice.multiply(new BigDecimal("0.6"));
+                priceField.setText(importPrice.stripTrailingZeros().toPlainString());
+            }
+        } else if (priceField != null) {
+            priceField.setText("0");
         }
     }
 

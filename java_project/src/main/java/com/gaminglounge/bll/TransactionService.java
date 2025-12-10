@@ -15,4 +15,8 @@ public class TransactionService {
     public boolean addTransaction(Transaction t) {
         return transactionDAL.addTransaction(t);
     }
+
+    public List<Transaction> searchTransactions(String keyword) {
+        return transactionDAL.searchTransactions(keyword);
+    }
 }

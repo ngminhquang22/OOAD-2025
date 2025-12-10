@@ -1,11 +1,26 @@
 package com.gaminglounge.gui;
 
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Font;
+
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JPasswordField;
+import javax.swing.JTextField;
+import javax.swing.SwingConstants;
+import javax.swing.border.EmptyBorder;
+
 import com.gaminglounge.bll.AuthService;
 import com.gaminglounge.model.User;
-
-import javax.swing.*;
-import javax.swing.border.EmptyBorder;
-import java.awt.*;
 
 public class LoginWindow extends JFrame {
     private JTextField usernameField;
@@ -29,12 +44,16 @@ public class LoginWindow extends JFrame {
         JLabel titleLabel = new JLabel("GAMING LOUNGE");
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 28));
         titleLabel.setForeground(new Color(0, 200, 255)); // Cyan accent
-        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        titleLabel.setMaximumSize(new Dimension(Integer.MAX_VALUE, titleLabel.getPreferredSize().height));
         
         JLabel subtitleLabel = new JLabel("Hệ thống quản lý");
         subtitleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         subtitleLabel.setForeground(Color.GRAY);
-        subtitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        subtitleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        subtitleLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        subtitleLabel.setMaximumSize(new Dimension(Integer.MAX_VALUE, subtitleLabel.getPreferredSize().height));
 
         // Form Fields
         JLabel userLabel = new JLabel("Tên đăng nhập");
@@ -42,12 +61,14 @@ public class LoginWindow extends JFrame {
         usernameField = new JTextField();
         usernameField.putClientProperty("JTextField.placeholderText", "Nhập tên đăng nhập");
         usernameField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        usernameField.setAlignmentX(Component.LEFT_ALIGNMENT);
         
         JLabel passLabel = new JLabel("Mật khẩu");
         passLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         passwordField = new JPasswordField();
         passwordField.putClientProperty("JTextField.placeholderText", "Nhập mật khẩu");
         passwordField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        passwordField.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         // Login Button
         JButton loginButton = new JButton("ĐĂNG NHẬP");
@@ -56,7 +77,7 @@ public class LoginWindow extends JFrame {
         loginButton.setForeground(Color.WHITE);
         loginButton.setFocusPainted(false);
         loginButton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 45));
-        loginButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        loginButton.setAlignmentX(Component.LEFT_ALIGNMENT);
         loginButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
         loginButton.addActionListener(e -> login());
         
@@ -89,12 +110,26 @@ public class LoginWindow extends JFrame {
         String username = usernameField.getText();
         String password = new String(passwordField.getPassword());
 
-        User user = authService.login(username, password);
-        if (user != null) {
-            new DashboardWindow(user).setVisible(true);
-            this.dispose();
-        } else {
-            JOptionPane.showMessageDialog(this, "Thông tin đăng nhập không hợp lệ", "Lỗi", JOptionPane.ERROR_MESSAGE);
+        try {
+            User user = authService.login(username, password);
+            
+            // Check if Staff (Role ID 2)
+            if (user.getRoleId() == 2) {
+                StaffTimekeepingDialog dialog = new StaffTimekeepingDialog(this, user);
+                dialog.setVisible(true);
+                
+                // Only proceed if user didn't just close the window (confirmed means they clicked a button)
+                if (dialog.isConfirmed()) {
+                    new DashboardWindow(user).setVisible(true);
+                    this.dispose();
+                }
+            } else {
+                new DashboardWindow(user).setVisible(true);
+                this.dispose();
+            }
+            
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, e.getMessage(), "Lỗi đăng nhập", JOptionPane.ERROR_MESSAGE);
         }
     }
 }

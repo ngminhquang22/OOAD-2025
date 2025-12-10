@@ -1,7 +1,5 @@
 package com.gaminglounge.dal;
 
-import com.gaminglounge.model.Computer;
-import com.gaminglounge.utils.DatabaseHelper;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -9,6 +7,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.gaminglounge.model.Computer;
+import com.gaminglounge.utils.DatabaseHelper;
 
 public class ComputerDAL {
 
@@ -33,16 +34,57 @@ public class ComputerDAL {
         return computers;
     }
 
-    public void updateStatus(int computerId, String status) {
+    public boolean updateStatus(int computerId, String status) throws SQLException {
         String sql = "UPDATE Computers SET Status = ? WHERE ComputerID = ?";
         try (Connection conn = DatabaseHelper.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             
             pstmt.setString(1, status);
             pstmt.setInt(2, computerId);
-            pstmt.executeUpdate();
+            return pstmt.executeUpdate() > 0;
+        }
+    }
+
+    public boolean addComputer(Computer computer) {
+        String sql = "INSERT INTO Computers (ComputerName, Status, Location) VALUES (?, ?, ?)";
+        try (Connection conn = DatabaseHelper.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
+            pstmt.setString(1, computer.getComputerName());
+            pstmt.setString(2, computer.getStatus());
+            pstmt.setString(3, computer.getLocation());
+            return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
+            return false;
+        }
+    }
+
+    public boolean updateComputer(Computer computer) {
+        String sql = "UPDATE Computers SET ComputerName = ?, Location = ? WHERE ComputerID = ?";
+        try (Connection conn = DatabaseHelper.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
+            pstmt.setString(1, computer.getComputerName());
+            pstmt.setString(2, computer.getLocation());
+            pstmt.setInt(3, computer.getComputerId());
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public boolean deleteComputer(int computerId) {
+        String sql = "DELETE FROM Computers WHERE ComputerID = ?";
+        try (Connection conn = DatabaseHelper.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
+            pstmt.setInt(1, computerId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
         }
     }
 }

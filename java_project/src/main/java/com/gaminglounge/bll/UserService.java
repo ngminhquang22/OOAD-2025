@@ -8,21 +8,45 @@ import com.gaminglounge.model.User;
 public class UserService {
     private UserDAL userDAL = new UserDAL();
 
-    public List<User> getAllUsers() {
-        return userDAL.getAllUsers();
+    public List<User> getAllUsers(boolean includeDeleted) {
+        return userDAL.getAllUsers(includeDeleted);
     }
 
-    public boolean addUser(String username, String password, String email, String roleName) {
-        if (username == null || username.isEmpty() || password == null || password.isEmpty()) {
-            return false;
+    public void addUser(String username, String password, String email, String roleName) throws Exception {
+        // 1. Validate Username
+        if (username == null || username.trim().isEmpty()) {
+            throw new Exception("Tên đăng nhập không được để trống.");
         }
-        // Check if username exists
+        if (username.length() < 3) {
+            throw new Exception("Tên đăng nhập phải có ít nhất 3 ký tự.");
+        }
+        if (!username.matches("^[a-zA-Z0-9_]+$")) {
+            throw new Exception("Tên đăng nhập chỉ được chứa chữ cái, số và dấu gạch dưới.");
+        }
         if (userDAL.getByUsername(username) != null) {
-            return false;
+            throw new Exception("Tên đăng nhập đã tồn tại.");
+        }
+
+        // 2. Validate Password
+        if (password == null || password.isEmpty()) {
+            throw new Exception("Mật khẩu không được để trống.");
+        }
+        if (password.length() < 6) {
+            throw new Exception("Mật khẩu phải có ít nhất 6 ký tự.");
+        }
+
+        // 3. Validate Email
+        if (email == null || email.trim().isEmpty()) {
+            throw new Exception("Email không được để trống.");
+        }
+        if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            throw new Exception("Email không đúng định dạng (ví dụ: user@example.com).");
         }
 
         int roleId = userDAL.getRoleIdByName(roleName);
-        if (roleId == -1) return false;
+        if (roleId == -1) {
+            throw new Exception("Vai trò không hợp lệ.");
+        }
 
         User u = new User();
         u.setUsername(username);
@@ -30,15 +54,28 @@ public class UserService {
         u.setEmail(email);
         u.setRoleId(roleId);
         
-        return userDAL.addUser(u);
+        if (!userDAL.addUser(u)) {
+            throw new Exception("Lỗi cơ sở dữ liệu khi thêm người dùng.");
+        }
     }
 
-    public boolean updateUser(User user, String roleName) {
+    public void updateUser(User user, String roleName) throws Exception {
+        // Validate Email
+        if (user.getEmail() == null || user.getEmail().trim().isEmpty()) {
+            throw new Exception("Email không được để trống.");
+        }
+        if (!user.getEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            throw new Exception("Email không đúng định dạng.");
+        }
+
         int roleId = userDAL.getRoleIdByName(roleName);
         if (roleId != -1) {
             user.setRoleId(roleId);
         }
-        return userDAL.updateUser(user);
+        
+        if (!userDAL.updateUser(user)) {
+            throw new Exception("Lỗi cơ sở dữ liệu khi cập nhật.");
+        }
     }
 
     public boolean changePassword(int userId, String newPassword) {
