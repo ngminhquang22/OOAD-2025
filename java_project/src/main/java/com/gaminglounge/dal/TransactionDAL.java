@@ -8,6 +8,7 @@ import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.gaminglounge.model.Transaction;
 import com.gaminglounge.utils.DatabaseHelper;
@@ -103,5 +104,14 @@ public class TransactionDAL {
             e.printStackTrace();
         }
         return list;
+    }
+    public List<Transaction> getHistoryByCustomer(int customerId) {
+        List<Transaction> all = getAllTransactions();
+        
+        // Lọc trong list lấy ra những giao dịch của customerId này
+        return all.stream()
+                .filter(t -> t.getCustomerId() == customerId)
+                .sorted((t1, t2) -> t2.getTransactionDate().compareTo(t1.getTransactionDate())) // Sắp xếp mới nhất lên đầu
+                .collect(Collectors.toList());
     }
 }

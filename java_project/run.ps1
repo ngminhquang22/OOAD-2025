@@ -1,4 +1,4 @@
-$projectRoot = "c:\Users\Admin\Downloads\ooad\java_project"
+$projectRoot = "C:\vh\oop\OOAD-2025\java_project"
 Set-Location $projectRoot
 
 # Check for MySQL Driver
