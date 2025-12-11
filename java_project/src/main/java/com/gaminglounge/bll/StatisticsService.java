@@ -43,4 +43,20 @@ public class StatisticsService {
     public double getImportValue(LocalDate startDate, LocalDate endDate) {
         return statisticsDAL.getImportValue(startDate, endDate);
     }
+
+    public int getNewCustomersCount(LocalDate date) {
+        return statisticsDAL.getNewCustomersCount(date);
+    }
+
+    public int getComputerCountByStatus(String status) {
+        return statisticsDAL.getComputerCountByStatus(status);
+    }
+
+    public int getTotalComputers() {
+        return statisticsDAL.getTotalComputers();
+    }
+
+    public int getWarningComputersCount() {
+        return statisticsDAL.getWarningComputersCount();
+    }
 }

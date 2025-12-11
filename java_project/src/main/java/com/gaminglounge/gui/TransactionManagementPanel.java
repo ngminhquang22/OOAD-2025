@@ -9,7 +9,9 @@ import java.awt.Frame;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.event.ItemEvent;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.BorderFactory;
@@ -27,21 +29,21 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.JToolBar;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 
 import com.gaminglounge.bll.CustomerService;
 import com.gaminglounge.bll.InventoryService;
 import com.gaminglounge.bll.OrderService;
+import com.gaminglounge.bll.ServiceRequestService;
 import com.gaminglounge.bll.TransactionService;
 import com.gaminglounge.model.Customer;
 import com.gaminglounge.model.Order;
 import com.gaminglounge.model.OrderDetail;
 import com.gaminglounge.model.Product;
+import com.gaminglounge.model.ServiceRequest;
 import com.gaminglounge.model.Transaction;
-
-import java.awt.event.ItemEvent;
-import java.util.ArrayList;
 
 public class TransactionManagementPanel extends JPanel {
     // Transaction History Components
@@ -49,9 +51,16 @@ public class TransactionManagementPanel extends JPanel {
     private CustomerService customerService;
     private InventoryService inventoryService;
     private OrderService orderService;
+    private ServiceRequestService requestService;
+    
     private JTable transactionTable;
     private DefaultTableModel tableModel;
     private JTextField searchField;
+
+    // Request Components
+    private JTable requestTable;
+    private DefaultTableModel requestModel;
+    private Timer requestRefreshTimer;
 
     public TransactionManagementPanel() {
         setLayout(new BorderLayout());
@@ -66,6 +75,9 @@ public class TransactionManagementPanel extends JPanel {
         
         // Tab 2: Danh sách hóa đơn (OrderManagementPanel)
         tabbedPane.addTab("Danh sách hóa đơn", new OrderManagementPanel());
+
+        // Tab 3: Yêu cầu dịch vụ
+        tabbedPane.addTab("Yêu cầu dịch vụ", createServiceRequestPanel());
         
         add(tabbedPane, BorderLayout.CENTER);
     }
@@ -404,6 +416,95 @@ public class TransactionManagementPanel extends JPanel {
         gbc.weightx = 0.7;
         field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         panel.add(field, gbc);
+    }
+    
+    // ==================== SERVICE REQUEST TAB ====================
+    private JPanel createServiceRequestPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(new EmptyBorder(10, 0, 0, 0));
+        requestService = new ServiceRequestService();
+
+        // Toolbar
+        JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JButton refreshBtn = new JButton("Làm mới");
+        JButton completeBtn = new JButton("Hoàn thành / Đã xử lý");
+        styleButton(refreshBtn, new Color(52, 152, 219));
+        styleButton(completeBtn, new Color(46, 204, 113));
+
+        refreshBtn.addActionListener(e -> loadRequests());
+        completeBtn.addActionListener(e -> completeSelectedRequest());
+
+        toolbar.add(refreshBtn);
+        toolbar.add(completeBtn);
+        panel.add(toolbar, BorderLayout.NORTH);
+
+        // Table
+        String[] cols = {"ID", "Khách hàng", "Loại", "Nội dung", "Thời gian", "Trạng thái"};
+        requestModel = new DefaultTableModel(cols, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
+        };
+        requestTable = new JTable(requestModel);
+        requestTable.setRowHeight(30);
+        requestTable.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        
+        panel.add(new JScrollPane(requestTable), BorderLayout.CENTER);
+
+        // Auto Refresh every 5 seconds
+        requestRefreshTimer = new Timer(5000, e -> loadRequests());
+        requestRefreshTimer.start();
+
+        loadRequests();
+        return panel;
+    }
+
+    private void loadRequests() {
+        List<ServiceRequest> list = requestService.getPendingRequests();
+        requestModel.setRowCount(0);
+        for (ServiceRequest r : list) {
+            requestModel.addRow(new Object[]{
+                r.getRequestId(),
+                r.getCustomerName(),
+                r.getRequestType(),
+                r.getContent(),
+                r.getCreatedAt(),
+                r.getStatus()
+            });
+        }
+    }
+
+    private void completeSelectedRequest() {
+        int row = requestTable.getSelectedRow();
+        if (row == -1) return;
+        
+        int id = (int) requestTable.getValueAt(row, 0);
+        String type = (String) requestTable.getValueAt(row, 2);
+        String content = (String) requestTable.getValueAt(row, 3);
+
+        int confirm = JOptionPane.showConfirmDialog(this, 
+            "Xác nhận đã xử lý yêu cầu này?\n" + type + ": " + content, 
+            "Xác nhận", JOptionPane.YES_NO_OPTION);
+            
+        if (confirm == JOptionPane.YES_OPTION) {
+            if (requestService.completeRequest(id)) {
+                loadRequests();
+            } else {
+                JOptionPane.showMessageDialog(this, "Lỗi khi cập nhật trạng thái.");
+            }
+        }
+    }
+
+    private void styleButton(JButton btn, Color bg) {
+        btn.setBackground(bg);
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+    }
+
+    @Override
+    public void removeNotify() {
+        super.removeNotify();
+        if (requestRefreshTimer != null) requestRefreshTimer.stop();
     }
     
     private static class CustomerItem {

@@ -71,7 +71,7 @@ public class LoginWindow extends JFrame {
         passwordField.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         // Login Button
-        JButton loginButton = new JButton("ĐĂNG NHẬP");
+        JButton loginButton = new JButton("ĐĂNG NHẬP QUẢN TRỊ");
         loginButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
         loginButton.setBackground(new Color(0, 120, 215));
         loginButton.setForeground(Color.WHITE);
@@ -80,6 +80,18 @@ public class LoginWindow extends JFrame {
         loginButton.setAlignmentX(Component.LEFT_ALIGNMENT);
         loginButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
         loginButton.addActionListener(e -> login());
+        
+        // Client Login Link
+        JButton clientLoginBtn = new JButton("Khách hàng đăng nhập tại đây");
+        clientLoginBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
+        clientLoginBtn.setForeground(new Color(0, 120, 215));
+        clientLoginBtn.setContentAreaFilled(false);
+        clientLoginBtn.setBorderPainted(false);
+        clientLoginBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        clientLoginBtn.addActionListener(e -> {
+            new ClientLoginWindow().setVisible(true);
+            this.dispose();
+        });
         
         // Add components with spacing
         mainPanel.add(Box.createVerticalGlue());
@@ -98,6 +110,9 @@ public class LoginWindow extends JFrame {
         mainPanel.add(Box.createRigidArea(new Dimension(0, 40)));
         
         mainPanel.add(loginButton);
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        mainPanel.add(clientLoginBtn);
+        mainPanel.add(Box.createVerticalGlue());
         mainPanel.add(Box.createVerticalGlue());
 
         add(mainPanel, BorderLayout.CENTER);
@@ -113,7 +128,14 @@ public class LoginWindow extends JFrame {
         try {
             User user = authService.login(username, password);
             
-            // Check if Staff (Role ID 2)
+            // 1. Check if Member (Client)
+            if ("Member".equalsIgnoreCase(user.getRoleName()) || user.getRoleId() == 3) {
+                new ClientDashboardWindow(user).setVisible(true);
+                this.dispose();
+                return;
+            }
+
+            // 2. Check if Staff (Role ID 2)
             if (user.getRoleId() == 2) {
                 StaffTimekeepingDialog dialog = new StaffTimekeepingDialog(this, user);
                 dialog.setVisible(true);

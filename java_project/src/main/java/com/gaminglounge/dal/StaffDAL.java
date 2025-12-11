@@ -44,6 +44,34 @@ public class StaffDAL {
         return staffList;
     }
 
+    public Staff getStaffByUserId(int userId) {
+        String sql = "SELECT s.*, u.Username, u.Email FROM Staff s " +
+                     "JOIN Users u ON s.UserID = u.UserID " +
+                     "WHERE s.UserID = ?";
+        try (Connection conn = DatabaseHelper.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, userId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                Staff staff = new Staff(
+                    rs.getInt("StaffID"),
+                    rs.getInt("UserID"),
+                    rs.getString("FullName"),
+                    rs.getString("Position"),
+                    getSafeTime(rs, "ShiftStart"),
+                    getSafeTime(rs, "ShiftEnd"),
+                    rs.getBigDecimal("Salary")
+                );
+                staff.setUsername(rs.getString("Username"));
+                staff.setEmail(rs.getString("Email"));
+                return staff;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     private Time getSafeTime(ResultSet rs, String column) throws SQLException {
         try {
             return rs.getTime(column);
@@ -150,35 +178,5 @@ public class StaffDAL {
             e.printStackTrace();
             return false;
         }
-    }
-
-    public Staff getStaffByUserId(int userId) {
-        String sql = "SELECT s.*, u.Username, u.Email FROM Staff s " +
-                     "JOIN Users u ON s.UserID = u.UserID " +
-                     "WHERE s.UserID = ?";
-        try (Connection conn = DatabaseHelper.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
-            pstmt.setInt(1, userId);
-            ResultSet rs = pstmt.executeQuery();
-            
-            if (rs.next()) {
-                Staff staff = new Staff(
-                    rs.getInt("StaffID"),
-                    rs.getInt("UserID"),
-                    rs.getString("FullName"),
-                    rs.getString("Position"),
-                    getSafeTime(rs, "ShiftStart"),
-                    getSafeTime(rs, "ShiftEnd"),
-                    rs.getBigDecimal("Salary")
-                );
-                staff.setUsername(rs.getString("Username"));
-                staff.setEmail(rs.getString("Email"));
-                return staff;
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return null;
     }
 }

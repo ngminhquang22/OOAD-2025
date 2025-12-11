@@ -33,6 +33,7 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.JTable;
 
 import com.gaminglounge.bll.ComputerService;
+import com.gaminglounge.bll.StatisticsService;
 import com.gaminglounge.bll.WorkScheduleService;
 import com.gaminglounge.model.Computer;
 import com.gaminglounge.model.User;
@@ -40,12 +41,14 @@ import com.gaminglounge.model.WorkSchedule;
 
 import java.util.Calendar;
 import java.util.Date;
+import java.time.LocalDate;
 import java.text.SimpleDateFormat;
 
 public class AdminDashboardPanel extends JPanel {
     private User currentUser;
     private ComputerService computerService;
     private WorkScheduleService workScheduleService;
+    private StatisticsService statisticsService;
     
     // Layout Components
     private JPanel sidebarPanel;
@@ -62,6 +65,7 @@ public class AdminDashboardPanel extends JPanel {
         System.out.println("Logged in as: " + user.getUsername() + ", RoleID: " + user.getRoleId() + ", RoleName: " + user.getRoleName());
         this.computerService = new ComputerService();
         this.workScheduleService = new WorkScheduleService();
+        this.statisticsService = new StatisticsService();
         this.navButtons = new HashMap<>();
 
         setLayout(new BorderLayout());
@@ -221,7 +225,7 @@ public class AdminDashboardPanel extends JPanel {
         // 6. Transactions Panel
         contentPanel.add(new TransactionManagementPanel(), "TRANSACTIONS");
 
-        // 7. Inventory
+        // 8. Inventory
         contentPanel.add(new InventoryManagementPanel(currentUser), "INVENTORY");
         contentPanel.add(new StatisticsPanel(), "REPORTS");
     }
@@ -237,10 +241,22 @@ public class AdminDashboardPanel extends JPanel {
         JPanel statsPanel = new JPanel(new GridLayout(1, 4, 20, 0));
         statsPanel.setPreferredSize(new Dimension(0, 150));
         
-        statsPanel.add(createStatCard("Máy đang dùng", "12/50", new Color(46, 204, 113)));
-        statsPanel.add(createStatCard("Doanh thu hôm nay", "5.2M", new Color(52, 152, 219)));
-        statsPanel.add(createStatCard("Khách hàng mới", "+8", new Color(155, 89, 182)));
-        statsPanel.add(createStatCard("Cảnh báo", "2 Máy lỗi", new Color(231, 76, 60)));
+        // Fetch Real Data
+        LocalDate today = LocalDate.now();
+        int activeComputers = statisticsService.getComputerCountByStatus("Occupied");
+        int totalComputers = statisticsService.getTotalComputers();
+        
+        double depositRev = statisticsService.getTotalDepositRevenue(today, today);
+        double timeRev = statisticsService.getTotalTimeSalesRevenue(today, today);
+        double totalRev = depositRev + timeRev;
+        
+        int newCustomers = statisticsService.getNewCustomersCount(today);
+        int warnings = statisticsService.getWarningComputersCount();
+        
+        statsPanel.add(createStatCard("Máy đang dùng", activeComputers + "/" + totalComputers, new Color(46, 204, 113)));
+        statsPanel.add(createStatCard("Doanh thu hôm nay", String.format("%,.0f", totalRev), new Color(52, 152, 219)));
+        statsPanel.add(createStatCard("Khách hàng mới", "+" + newCustomers, new Color(155, 89, 182)));
+        statsPanel.add(createStatCard("Cảnh báo", warnings + " Máy lỗi", new Color(231, 76, 60)));
 
         panel.add(statsPanel, BorderLayout.CENTER);
         

@@ -20,6 +20,10 @@ public class CustomerService {
         return customerDAL.getByUserId(userId);
     }
 
+    public Customer getCustomerById(int customerId) {
+        return customerDAL.getCustomerById(customerId);
+    }
+
     public boolean addCustomer(Customer customer, String username, String password, String email) {
         // Basic validation
         if (username == null || username.isEmpty() || password == null || password.isEmpty()) {

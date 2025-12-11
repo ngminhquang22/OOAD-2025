@@ -143,4 +143,63 @@ public class StatisticsDAL {
         }
         return 0;
     }
+
+    // Dashboard Overview Stats
+    public int getNewCustomersCount(LocalDate date) {
+        String sql = "SELECT COUNT(*) FROM Users u JOIN Customers c ON u.UserID = c.UserID WHERE DATE(u.CreatedAt) = ?";
+        try (Connection conn = DatabaseHelper.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setDate(1, Date.valueOf(date));
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public int getComputerCountByStatus(String status) {
+        String sql = "SELECT COUNT(*) FROM Computers WHERE Status = ?";
+        try (Connection conn = DatabaseHelper.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, status);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public int getTotalComputers() {
+        String sql = "SELECT COUNT(*) FROM Computers";
+        try (Connection conn = DatabaseHelper.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public int getWarningComputersCount() {
+        String sql = "SELECT COUNT(*) FROM Computers WHERE Status IN ('Maintenance', 'Broken', 'Error')";
+        try (Connection conn = DatabaseHelper.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
 }

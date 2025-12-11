@@ -31,25 +31,52 @@ import javax.swing.table.DefaultTableModel;
 
 import com.gaminglounge.bll.CustomerService;
 import com.gaminglounge.bll.StaffService;
+import com.gaminglounge.bll.ServiceRequestService;
 import com.gaminglounge.model.Customer;
 import com.gaminglounge.model.Staff;
 import com.gaminglounge.model.User;
+import com.gaminglounge.model.ServiceRequest;
+
+import javax.swing.JTabbedPane;
+import javax.swing.JTextArea;
+import javax.swing.Timer;
 
 public class CustomerManagementPanel extends JPanel {
     private CustomerService customerService;
     private StaffService staffService;
+    private ServiceRequestService requestService;
     private User currentUser;
+    
+    // Customer List Components
     private JTable customerTable;
     private DefaultTableModel tableModel;
+
+    // Chat Components
+    private JTable chatTable;
+    private DefaultTableModel chatModel;
+    private Timer chatRefreshTimer;
 
     public CustomerManagementPanel(User user) {
         this.currentUser = user;
         this.customerService = new CustomerService();
         this.staffService = new StaffService();
+        this.requestService = new ServiceRequestService();
         
         setLayout(new BorderLayout());
         setBorder(new EmptyBorder(10, 10, 10, 10));
 
+        JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+
+        tabbedPane.addTab("Danh sách khách hàng", createCustomerListPanel());
+        tabbedPane.addTab("Tin nhắn / Hỗ trợ", createChatPanel());
+
+        add(tabbedPane, BorderLayout.CENTER);
+    }
+
+    private JPanel createCustomerListPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        
         // Toolbar
         JToolBar toolBar = new JToolBar();
         toolBar.setFloatable(false);
@@ -61,7 +88,7 @@ public class CustomerManagementPanel extends JPanel {
         JButton refreshButton = createToolbarButton("Làm mới", null);
         JButton topUpButton = createToolbarButton("Nạp tiền", new Color(46, 204, 113));
         JButton extendButton = createToolbarButton("Gia hạn", new Color(155, 89, 182));
-        JButton chatButton = createToolbarButton("Chat", new Color(241, 196, 15));
+        JButton chatButton = createToolbarButton("Gửi tin nhắn", new Color(241, 196, 15));
 
         addButton.addActionListener(e -> showAddDialog());
         editButton.addActionListener(e -> showEditDialog());
@@ -85,7 +112,7 @@ public class CustomerManagementPanel extends JPanel {
         toolBar.addSeparator(new Dimension(10, 0));
         toolBar.add(chatButton);
         
-        add(toolBar, BorderLayout.NORTH);
+        panel.add(toolBar, BorderLayout.NORTH);
 
         // Table
         String[] columnNames = {"ID", "Họ tên", "Tài khoản", "Email", "SĐT", "Số dư", "Hạng TV", "Giờ còn lại", "Máy đang dùng"};
@@ -100,11 +127,118 @@ public class CustomerManagementPanel extends JPanel {
         customerTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
         customerTable.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         
-        JScrollPane scrollPane = new JScrollPane(customerTable);
-        scrollPane.setBorder(BorderFactory.createLineBorder(new Color(80, 80, 80)));
-        add(scrollPane, BorderLayout.CENTER);
-
+        panel.add(new JScrollPane(customerTable), BorderLayout.CENTER);
+        
         loadData();
+        return panel;
+    }
+
+    private JPanel createChatPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        
+        // Header
+        JLabel title = new JLabel("Tin nhắn từ khách hàng");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        title.setBorder(new EmptyBorder(0, 0, 10, 0));
+        panel.add(title, BorderLayout.NORTH);
+
+        // Table
+        String[] cols = {"ID", "Khách hàng", "Nội dung", "Thời gian", "CustomerID"};
+        chatModel = new DefaultTableModel(cols, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
+        };
+        chatTable = new JTable(chatModel);
+        chatTable.setRowHeight(30);
+        chatTable.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        
+        // Hide CustomerID column
+        chatTable.getColumnModel().getColumn(4).setMinWidth(0);
+        chatTable.getColumnModel().getColumn(4).setMaxWidth(0);
+        chatTable.getColumnModel().getColumn(4).setWidth(0);
+        
+        // Double click to reply/mark read
+        chatTable.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                if (evt.getClickCount() == 2) {
+                    int row = chatTable.getSelectedRow();
+                    if (row != -1) {
+                        int id = (int) chatTable.getValueAt(row, 0);
+                        String customer = (String) chatTable.getValueAt(row, 1);
+                        String content = (String) chatTable.getValueAt(row, 2);
+                        int customerId = (int) chatTable.getValueAt(row, 4);
+                        showReplyDialog(id, customerId, customer, content);
+                    }
+                }
+            }
+        });
+
+        panel.add(new JScrollPane(chatTable), BorderLayout.CENTER);
+
+        // Auto Refresh every 3 seconds
+        chatRefreshTimer = new Timer(3000, e -> loadChats());
+        chatRefreshTimer.start();
+
+        loadChats();
+        return panel;
+    }
+
+    private void loadChats() {
+        List<ServiceRequest> list = requestService.getPendingChats();
+        chatModel.setRowCount(0);
+        for (ServiceRequest r : list) {
+            chatModel.addRow(new Object[]{
+                r.getRequestId(),
+                r.getCustomerName(),
+                r.getContent(),
+                r.getCreatedAt(),
+                r.getCustomerId()
+            });
+        }
+    }
+
+    private void showReplyDialog(int requestId, int customerId, String customerName, String content) {
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Chat với " + customerName, true);
+        dialog.setLayout(new BorderLayout());
+        dialog.setSize(400, 300);
+        dialog.setLocationRelativeTo(this);
+
+        JTextArea historyArea = new JTextArea("Khách hàng: " + content + "\n");
+        historyArea.setEditable(false);
+        historyArea.setLineWrap(true);
+        historyArea.setWrapStyleWord(true);
+        historyArea.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        JPanel inputPanel = new JPanel(new BorderLayout(5, 5));
+        inputPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
+        JTextField replyField = new JTextField();
+        JButton sendBtn = new JButton("Gửi & Hoàn tất");
+        
+        sendBtn.addActionListener(e -> {
+            String reply = replyField.getText().trim();
+            if (!reply.isEmpty()) {
+                requestService.sendReply(customerId, reply);
+            }
+            // Mark as completed (read)
+            requestService.completeRequest(requestId);
+            dialog.dispose();
+            loadChats();
+        });
+
+        inputPanel.add(new JLabel("Trả lời (Admin):"), BorderLayout.NORTH);
+        inputPanel.add(replyField, BorderLayout.CENTER);
+        inputPanel.add(sendBtn, BorderLayout.SOUTH);
+
+        dialog.add(new JScrollPane(historyArea), BorderLayout.CENTER);
+        dialog.add(inputPanel, BorderLayout.SOUTH);
+        
+        dialog.setVisible(true);
+    }
+
+    @Override
+    public void removeNotify() {
+        super.removeNotify();
+        if (chatRefreshTimer != null) chatRefreshTimer.stop();
     }
     
     private JButton createToolbarButton(String text, Color bg) {
@@ -386,22 +520,59 @@ public class CustomerManagementPanel extends JPanel {
     private void showChatDialog() {
         int selectedRow = customerTable.getSelectedRow();
         if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(this, "Vui lòng chọn khách hàng để chat.");
+            JOptionPane.showMessageDialog(this, "Vui lòng chọn khách hàng để xem lịch sử chat.");
             return;
         }
         int customerId = (int) tableModel.getValueAt(selectedRow, 0);
         String customerName = (String) tableModel.getValueAt(selectedRow, 1);
         
-        String message = JOptionPane.showInputDialog(this, "Gửi tin nhắn đến " + customerName + ":");
-        if (message != null && !message.trim().isEmpty()) {
-            Staff currentStaff = staffService.getStaffByUserId(currentUser.getUserId());
-            int staffId = (currentStaff != null) ? currentStaff.getStaffId() : 1;
-            
-            if (customerService.sendMessage(customerId, staffId, message)) {
-                JOptionPane.showMessageDialog(this, "Đã gửi tin nhắn.");
-            } else {
-                JOptionPane.showMessageDialog(this, "Gửi tin nhắn thất bại.");
+        List<ServiceRequest> history = requestService.getCustomerHistory(customerId);
+        
+        StringBuilder sb = new StringBuilder();
+        if (history.isEmpty()) {
+            sb.append("Chưa có lịch sử chat nào.");
+        } else {
+            boolean hasChat = false;
+            for (ServiceRequest req : history) {
+                if ("Chat".equals(req.getRequestType())) {
+                    hasChat = true;
+                    sb.append("[").append(req.getCreatedAt()).append("] ");
+                    
+                    String sender = req.getSender();
+                    if (sender == null) sender = "Client";
+                    
+                    if ("Admin".equals(sender)) {
+                        sb.append("ADMIN: ");
+                    } else {
+                        sb.append("KHÁCH: ");
+                    }
+                    
+                    sb.append(req.getContent()).append("\n");
+                    sb.append("--------------------------------------------------\n");
+                }
             }
+            if (!hasChat) sb.append("Chưa có tin nhắn chat nào.");
         }
+        
+        JTextArea area = new JTextArea(sb.toString());
+        area.setEditable(false);
+        area.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        area.setBorder(new EmptyBorder(10, 10, 10, 10));
+        
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Lịch sử Chat: " + customerName, true);
+        dialog.setLayout(new BorderLayout());
+        dialog.add(new JScrollPane(area), BorderLayout.CENTER);
+        
+        JButton closeBtn = new JButton("Đóng");
+        closeBtn.addActionListener(e -> dialog.dispose());
+        JPanel btnPanel = new JPanel();
+        btnPanel.add(closeBtn);
+        dialog.add(btnPanel, BorderLayout.SOUTH);
+        
+        dialog.setSize(500, 400);
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
     }
 }
