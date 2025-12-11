@@ -128,10 +128,17 @@ public class LoginWindow extends JFrame {
         try {
             User user = authService.login(username, password);
             
-            // 1. Check if Member (Client)
+            if (user == null) {
+                JOptionPane.showMessageDialog(this, "Sai tên đăng nhập hoặc mật khẩu!", "Lỗi đăng nhập", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            
+            // 1. Check if Member (Client) -> DENY ACCESS
             if ("Member".equalsIgnoreCase(user.getRoleName()) || user.getRoleId() == 3) {
-                new ClientDashboardWindow(user).setVisible(true);
-                this.dispose();
+                JOptionPane.showMessageDialog(this, 
+                    "Tài khoản Khách hàng vui lòng sử dụng trang đăng nhập dành riêng cho khách hàng.", 
+                    "Truy cập bị từ chối", 
+                    JOptionPane.WARNING_MESSAGE);
                 return;
             }
 

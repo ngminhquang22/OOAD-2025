@@ -126,6 +126,7 @@ public class StaffManagementPanel extends JPanel {
         JButton nextWeekBtn = createToolbarButton("Tuần sau >", null);
         JButton currentWeekBtn = createToolbarButton("Tuần hiện tại", null);
         JButton addShiftBtn = createToolbarButton("Thêm lịch", new Color(0, 122, 204));
+        JButton deleteShiftBtn = createToolbarButton("Xóa lịch", new Color(231, 76, 60));
         
         weekLabel = new JLabel("", SwingConstants.CENTER);
         weekLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
@@ -152,6 +153,7 @@ public class StaffManagementPanel extends JPanel {
         });
 
         addShiftBtn.addActionListener(e -> showAssignShiftDialog(null));
+        deleteShiftBtn.addActionListener(e -> deleteSelectedShift());
 
         toolBar.add(prevWeekBtn);
         toolBar.add(currentWeekBtn);
@@ -160,6 +162,8 @@ public class StaffManagementPanel extends JPanel {
         toolBar.add(weekLabel);
         toolBar.add(Box.createHorizontalGlue());
         toolBar.add(addShiftBtn);
+        toolBar.addSeparator(new Dimension(5, 0));
+        toolBar.add(deleteShiftBtn);
         
         panel.add(toolBar, BorderLayout.NORTH);
         
@@ -217,6 +221,76 @@ public class StaffManagementPanel extends JPanel {
         else if (row == 2) shiftType = "Ca Đêm";
         
         showAssignShiftDialog(selectedDate, shiftType);
+    }
+
+    private void deleteSelectedShift() {
+        int row = timetable.getSelectedRow();
+        int col = timetable.getSelectedColumn();
+        
+        if (row == -1 || col <= 0) {
+            JOptionPane.showMessageDialog(this, "Vui lòng chọn một ô lịch làm việc (không phải tiêu đề) để xóa.");
+            return;
+        }
+        
+        // Calculate Date
+        Calendar cal = (Calendar) currentWeekStart.clone();
+        cal.add(Calendar.DAY_OF_YEAR, col - 1);
+        Date selectedDate = new Date(cal.getTimeInMillis());
+        
+        // Fetch schedules for this date
+        List<WorkSchedule> dailySchedules = workScheduleService.getSchedulesByDate(selectedDate);
+        java.util.List<WorkSchedule> slotSchedules = new java.util.ArrayList<>();
+        
+        // Filter by Row (Shift Slot)
+        for (WorkSchedule ws : dailySchedules) {
+            String startStr = ws.getShiftStart().toString();
+            int startHour = Integer.parseInt(startStr.split(":")[0]);
+            
+            int targetRow = -1;
+            if (startHour >= 6 && startHour < 14) targetRow = 0;
+            else if (startHour >= 14 && startHour < 22) targetRow = 1;
+            else targetRow = 2;
+            
+            if (targetRow == row) {
+                slotSchedules.add(ws);
+            }
+        }
+        
+        if (slotSchedules.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Không có lịch làm việc nào trong ô này.");
+            return;
+        }
+        
+        WorkSchedule selectedSchedule = null;
+        if (slotSchedules.size() == 1) {
+            selectedSchedule = slotSchedules.get(0);
+        } else {
+            // Multiple shifts in this slot, ask user to pick
+            WorkSchedule[] choices = slotSchedules.toArray(new WorkSchedule[0]);
+            selectedSchedule = (WorkSchedule) JOptionPane.showInputDialog(
+                this, 
+                "Chọn nhân viên để xóa lịch:", 
+                "Xóa lịch làm việc", 
+                JOptionPane.QUESTION_MESSAGE, 
+                null, 
+                choices, 
+                choices[0]);
+        }
+        
+        if (selectedSchedule != null) {
+            int confirm = JOptionPane.showConfirmDialog(this, 
+                "Xóa lịch làm của " + selectedSchedule.getStaffName() + " (" + selectedSchedule.getShiftStart() + "-" + selectedSchedule.getShiftEnd() + ")?", 
+                "Xác nhận", JOptionPane.YES_NO_OPTION);
+                
+            if (confirm == JOptionPane.YES_OPTION) {
+                if (workScheduleService.deleteSchedule(selectedSchedule.getScheduleId())) {
+                    JOptionPane.showMessageDialog(this, "Đã xóa lịch làm việc.");
+                    loadWeeklySchedule();
+                } else {
+                    JOptionPane.showMessageDialog(this, "Xóa thất bại.");
+                }
+            }
+        }
     }
 
     private void loadWeeklySchedule() {
