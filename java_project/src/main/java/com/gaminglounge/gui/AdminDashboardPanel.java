@@ -33,9 +33,11 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.JTable;
 
 import com.gaminglounge.bll.ComputerService;
+import com.gaminglounge.bll.StaffService;
 import com.gaminglounge.bll.StatisticsService;
 import com.gaminglounge.bll.WorkScheduleService;
 import com.gaminglounge.model.Computer;
+import com.gaminglounge.model.Staff;
 import com.gaminglounge.model.User;
 import com.gaminglounge.model.WorkSchedule;
 
@@ -49,6 +51,7 @@ public class AdminDashboardPanel extends JPanel {
     private ComputerService computerService;
     private WorkScheduleService workScheduleService;
     private StatisticsService statisticsService;
+    private StaffService staffService;
     
     // Layout Components
     private JPanel sidebarPanel;
@@ -66,6 +69,7 @@ public class AdminDashboardPanel extends JPanel {
         this.computerService = new ComputerService();
         this.workScheduleService = new WorkScheduleService();
         this.statisticsService = new StatisticsService();
+        this.staffService = new StaffService();
         this.navButtons = new HashMap<>();
 
         setLayout(new BorderLayout());
@@ -149,9 +153,11 @@ public class AdminDashboardPanel extends JPanel {
         // Only add these if isAdmin is TRUE
         if (isAdmin) {
             addNavButton("Nhân viên", "STAFF");
-            addNavButton("Khách hàng", "CUSTOMERS");
             addNavButton("Tài khoản", "USERS");
         }
+        
+        // Available for both Admin and Staff
+        addNavButton("Khách hàng", "CUSTOMERS");
         
         addNavButton("Giao dịch", "TRANSACTIONS");
         addNavButton("Kho hàng", "INVENTORY");
@@ -213,9 +219,7 @@ public class AdminDashboardPanel extends JPanel {
         }
 
         // 4. Customers Panel
-        if (isAdmin) {
-            contentPanel.add(new CustomerManagementPanel(currentUser), "CUSTOMERS");
-        }
+        contentPanel.add(new CustomerManagementPanel(currentUser), "CUSTOMERS");
 
         // 5. Users Panel
         if (isAdmin) {
@@ -445,9 +449,13 @@ public class AdminDashboardPanel extends JPanel {
             java.sql.Date endDate = new java.sql.Date(endOfWeek.getTimeInMillis());
             List<WorkSchedule> schedules = workScheduleService.getSchedulesByDateRange(startDate, endDate);
             
+            // Get current staff ID
+            Staff currentStaff = staffService.getStaffByUserId(currentUser.getUserId());
+            int currentStaffId = (currentStaff != null) ? currentStaff.getStaffId() : -1;
+
             for (WorkSchedule ws : schedules) {
                 // Filter for current user
-                if (ws.getStaffId() != currentUser.getUserId()) continue;
+                if (ws.getStaffId() != currentStaffId) continue;
                 
                 Calendar wsCal = Calendar.getInstance();
                 wsCal.setTime(ws.getWorkDate());
